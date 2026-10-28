@@ -46,27 +46,33 @@ def parse_date(text, today):
     return None
 
 
+ROW_KEYWORDS = ["1回目", "日本語"]           # 只看「1回目（初めて） 日本語」这一行
+UNAVAILABLE = {"時間外", "空き無"}           # 页面上 －、× 对应的标签
+
+# 日期在 id=height_headday 的表头行；每个预约枠一行 id=height_auto_<名称>；
+# 每格里是 <svg aria-label="空き無/時間外/...">
 JS_FIND = """
-(marks) => {
-  const out = [];
-  for (const table of document.querySelectorAll('table')) {
-    const rows = [...table.rows];
-    if (!rows.length) continue;
-    const header = [...rows[0].cells].map(c => c.innerText.trim());
-    rows.forEach((row) => {
-      [...row.cells].forEach((cell, ci) => {
-        const t = cell.innerText.trim();
-        const alt = [...cell.querySelectorAll('img')].map(i => i.alt || '').join(' ');
-        const s = t + ' ' + alt;
-        if (marks.some(m => s.includes(m))) {
-          out.push({cell: s, colHead: header[ci] || '', rowHead: row.cells[0].innerText.trim()});
-        }
-      });
+() => {
+  const head = document.getElementById('height_headday');
+  if (!head) return {error: 'no header row', rows: []};
+  const dates = [...head.cells].map(c => c.innerText.replace(/\\s+/g, ' ').trim());
+  const rows = [];
+  for (const tr of document.querySelectorAll('tr[id^="height_auto_"]')) {
+    const label = tr.id.replace('height_auto_', '');
+    const cells = [...tr.querySelectorAll('td')].map(td => {
+      const svg = td.querySelector('[aria-label]');
+      return svg ? svg.getAttribute('aria-label') : td.innerText.trim();
     });
+    rows.push({label, cells});
   }
-  return out;
+  return {dates, rows};
 }
 """
+
+
+def norm(s):
+    # 全角数字转半角，去掉空白
+    return s.translate(str.maketrans("０１２３４５６７８９", "0123456789")).replace("\u3000", "").replace(" ", "")
 
 
 def snap(page, name):
@@ -76,36 +82,34 @@ def snap(page, name):
         f.write(page.content())
 
 
-def go_to_calendar(page):
-    page.goto(URL, wait_until="networkidle", timeout=60000)
-    snap(page, "01_detail")
-    for label in ["予約する", "日時を選択", "日時選択", "空き状況", "予約日時", "次へ"]:
-        for loc in (page.get_by_role("button", name=re.compile(label)),
-                    page.get_by_role("link", name=re.compile(label))):
-            if loc.count() > 0:
-                loc.first.click()
-                page.wait_for_load_state("networkidle")
-                snap(page, "02_calendar")
-                return
-
-
 def check(page):
     today = dt.datetime.now(JST).date()
     target = dt.date.fromisoformat(TARGET_DATE)
-    go_to_calendar(page)
-    found = set()
-    for i in range(10):
-        for hit in page.evaluate(JS_FIND, AVAILABLE_MARKS):
-            d = parse_date(hit["colHead"], today) or parse_date(hit["rowHead"], today)
-            if d and today < d < target:
-                found.add(d)
-        nxt = page.get_by_role("button", name=re.compile("次|翌|>")).or_(
-              page.get_by_role("link", name=re.compile("次の|翌週|次週|>")))
-        if nxt.count() == 0 or not nxt.first.is_enabled():
+    page.goto(URL, wait_until="networkidle", timeout=60000)
+    found, labels_seen = set(), set()
+    for i in range(6):  # 40天大约3页，多翻几次保险
+        snap(page, f"page{i + 1}")
+        data = page.evaluate(JS_FIND)
+        if data.get("error"):
+            raise RuntimeError("页面结构变了: " + data["error"])
+        dates = [parse_date(d, today) for d in data["dates"]]
+        for row in data["rows"]:
+            if not all(k in norm(row["label"]) for k in ROW_KEYWORDS):
+                continue
+            for d, status in zip(dates, row["cells"]):
+                labels_seen.add(status)
+                if d and today < d < target and status not in UNAVAILABLE:
+                    found.add(d)
+        print(f"第{i + 1}页: {data['dates'][0] if data['dates'] else '?'} ~ "
+              f"{data['dates'][-1] if data['dates'] else '?'}")
+        if dates and dates[-1] and dates[-1] >= target:
+            break
+        nxt = page.locator('input[type=button][value*="2週後"]')
+        if nxt.count() == 0 or not nxt.first.is_enabled() or not nxt.first.is_visible():
             break
         nxt.first.click()
         page.wait_for_load_state("networkidle")
-        snap(page, f"03_page{i + 1}")
+    print("出现过的格子状态:", sorted(labels_seen))
     return sorted(found)
 
 
