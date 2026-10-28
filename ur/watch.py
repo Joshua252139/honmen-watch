@@ -21,6 +21,7 @@ DANCHI = {
 API = "https://chintai.r6.ur-net.go.jp/chintai/api/bukken/detail/detail_bukken_room/"
 DRY_RUN = os.path.exists("ur/DRY_RUN")  # 调试用：不推送、不保存状态
 NTFY_TOPIC = "" if DRY_RUN else os.environ.get("NTFY_TOPIC", "")
+NTFY_EMAIL = os.environ.get("NTFY_EMAIL", "")  # 同时发邮件（从 GitHub Secrets 读取）
 STATE_FILE = "ur-state/seen.json"
 JST = ZoneInfo("Asia/Tokyo")
 
@@ -35,9 +36,12 @@ def push(title, msg, click):
         print("!! 没有读取到 NTFY_TOPIC 密钥，推送没有发出")
         return
     print(f"   推送到 topic: {NTFY_TOPIC[:4]}…{NTFY_TOPIC[-2:]}（长度 {len(NTFY_TOPIC)}）")
-    req = urllib.request.Request(
-        f"https://ntfy.sh/{NTFY_TOPIC}", data=msg.encode("utf-8"),
-        headers={"Title": title.encode("utf-8"), "Click": click, "Priority": "high", "Tags": "house"})
+    headers = {"Title": title.encode("utf-8"), "Click": click, "Priority": "high", "Tags": "house"}
+    if NTFY_EMAIL:
+        headers["Email"] = NTFY_EMAIL
+        msg = msg + "\n\n" + click
+        print("   同时发送邮件")
+    req = urllib.request.Request(f"https://ntfy.sh/{NTFY_TOPIC}", data=msg.encode("utf-8"), headers=headers)
     resp = urllib.request.urlopen(req, timeout=15)
     print("   ntfy 返回:", resp.status, resp.read().decode()[:200])
 

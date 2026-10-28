@@ -33,6 +33,7 @@ jobs:
       - name: Check rooms
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_EMAIL: ${{ secrets.NTFY_EMAIL }}
         run: python3 ur/watch.py 2>&1 | tee ur-run.log; exit ${PIPESTATUS[0]}
 
       - name: Save state
