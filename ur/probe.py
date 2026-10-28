@@ -5,7 +5,7 @@ NAMES = ["コンフォール川崎富士見", "リーデンスフォート横浜
 KEYS = ["川崎区", "神奈川区", "鶴見区"]
 out = {"pages": {}, "danchi": {}, "api": []}
 def links(pg):
-    return pg.evaluate("() => [...document.querySelectorAll('a')].map(a => [(a.innerText||a.textContent||'').trim().replace(/\\s+/g,' '), a.href])")
+    return pg.evaluate("() => [...document.querySelectorAll('a')].map(a => [(a.innerText||a.textContent||'').trim().replace(/\\s+/g,' '), (() => { try { return new URL(a.getAttribute('href')||'', location.href).href } catch(e) { return '' } })()])")
 with sync_playwright() as p:
     b = p.chromium.launch(); pg = b.new_page(locale="ja-JP")
     pg.on("request", lambda r: out["api"].append([r.method, r.url, r.post_data]) if "api" in r.url else None)
