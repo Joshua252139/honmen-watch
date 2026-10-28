@@ -5,6 +5,11 @@ on:
     # 每10分钟一次，只在日本时间 6:00~24:00 运行（cron 用的是 UTC）
     - cron: "*/10 21-23,0-14 * * *"
   workflow_dispatch: {}
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
 
 concurrency:
   group: honmen-watch
@@ -43,7 +48,7 @@ jobs:
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           TARGET_DATE: ${{ vars.TARGET_DATE || '2026-11-19' }}
-        run: python watch.py
+        run: python watch.py 2>&1 | tee run.log; exit ${PIPESTATUS[0]}
 
       - name: Save notify state
         if: always()
@@ -59,3 +64,15 @@ jobs:
           name: debug-screenshots
           path: debug/
           retention-days: 3
+
+      # 把最近一次的截图和日志放到 debug 分支，方便排查
+      - name: Publish latest debug to branch
+        if: always()
+        run: |
+          mkdir -p /tmp/out && cp -r debug run.log /tmp/out/ 2>/dev/null || true
+          date -u +%FT%TZ > /tmp/out/last_run.txt
+          cd /tmp/out
+          git init -q -b debug
+          git -c user.name=bot -c user.email=bot@users.noreply.github.com add -A
+          git -c user.name=bot -c user.email=bot@users.noreply.github.com commit -q -m "latest run"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" debug
