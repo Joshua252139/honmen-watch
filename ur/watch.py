@@ -67,7 +67,8 @@ def fetch_rooms(shisya, danchi, shikibetu):
         if not data:
             break
         rooms.extend(data)
-        if len(data) < 10:
+        total = int(data[0].get("allCount") or 0)
+        if len(rooms) >= total:
             break
         page += 1
     return rooms
@@ -82,26 +83,21 @@ def g(room, *keys):
 
 
 def room_id(room):
-    return g(room, "id", "roomNmMain", "name") + "|" + g(room, "roomNm", "roomNmSub", "floor")
+    return g(room, "id") or g(room, "name")
 
 
 def describe(room):
     parts = [
         g(room, "name", "roomNmMain"),
         g(room, "type", "roomType"),
-        g(room, "floorspace", "floorSpace"),
-        g(room, "rent", "rentNormal", "rent_normal"),
-        g(room, "commonfee", "commonFee"),
+        g(room, "floorspace").replace("&#13217;", "㎡"),
+        g(room, "rent", "rent_normal"),
+        ("共益費" + g(room, "commonfee")) if g(room, "commonfee") else "",
     ]
     return " / ".join(p for p in parts if p)
 
 
 def main():
-    if DRY_RUN:
-        for dn in ("145", "309"):
-            rs = fetch_rooms("40", dn, "0")
-            print("CONTROL", dn, len(rs))
-            if rs: print(json.dumps(rs[0], ensure_ascii=False)[:2500])
     os.makedirs("ur-state", exist_ok=True)
     try:
         seen = json.load(open(STATE_FILE, encoding="utf-8"))
