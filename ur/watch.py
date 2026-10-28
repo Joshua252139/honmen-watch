@@ -32,11 +32,14 @@ def page_url(shisya, danchi, shikibetu):
 def push(title, msg, click):
     print(f"[推送] {title}\n{msg}")
     if not NTFY_TOPIC:
+        print("!! 没有读取到 NTFY_TOPIC 密钥，推送没有发出")
         return
+    print(f"   推送到 topic: {NTFY_TOPIC[:4]}…{NTFY_TOPIC[-2:]}（长度 {len(NTFY_TOPIC)}）")
     req = urllib.request.Request(
         f"https://ntfy.sh/{NTFY_TOPIC}", data=msg.encode("utf-8"),
         headers={"Title": title.encode("utf-8"), "Click": click, "Priority": "high", "Tags": "house"})
-    urllib.request.urlopen(req, timeout=15)
+    resp = urllib.request.urlopen(req, timeout=15)
+    print("   ntfy 返回:", resp.status, resp.read().decode()[:200])
 
 
 def fetch_rooms(shisya, danchi, shikibetu):
@@ -98,6 +101,8 @@ def describe(room):
 
 
 def main():
+    if os.path.exists("ur/TEST_PUSH"):
+        push("UR 测试推送", "收到这条说明手机推送正常", "https://www.ur-net.go.jp/chintai/kanto/kanagawa/")
     os.makedirs("ur-state", exist_ok=True)
     try:
         seen = json.load(open(STATE_FILE, encoding="utf-8"))
