@@ -21,7 +21,7 @@ with sync_playwright() as p:
     pg.goto(URL, wait_until="networkidle", timeout=60000); cap(pg, 0)
     for i, text in enumerate(STEPS, 1):
         try:
-            loc = pg.get_by_text(text, exact=False).first
+            loc = pg.get_by_text(text, exact=True).first
             with pg.context.expect_page(timeout=5000) as newp:
                 loc.click()
             pg = newp.value
