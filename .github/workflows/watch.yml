@@ -48,7 +48,9 @@ jobs:
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           TARGET_DATE: ${{ vars.TARGET_DATE || '2026-11-19' }}
-        run: python watch.py 2>&1 | tee run.log; exit ${PIPESTATUS[0]}
+        run: |
+          python probe/probe.py 2>&1 | tee probe.log || true
+          python watch.py 2>&1 | tee run.log; exit ${PIPESTATUS[0]}
 
       - name: Save notify state
         if: always()
@@ -69,7 +71,7 @@ jobs:
       - name: Publish latest debug to branch
         if: always()
         run: |
-          mkdir -p /tmp/out && cp -r debug run.log /tmp/out/ 2>/dev/null || true
+          mkdir -p /tmp/out && cp -r debug run.log probe.log /tmp/out/ 2>/dev/null || true
           date -u +%FT%TZ > /tmp/out/last_run.txt
           cd /tmp/out
           git init -q -b debug
