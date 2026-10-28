@@ -1,0 +1,45 @@
+name: ur-watch
+
+on:
+  push:
+    branches: [main]
+    paths: ["ur/**", ".github/workflows/ur.yml"]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ur-watch
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-v1
+      - name: Install
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Run
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python ur/probe.py 2>&1 | tee ur-run.log
+      - name: Publish debug
+        if: always()
+        run: |
+          mkdir -p /tmp/out && cp -r ur-debug ur-run.log /tmp/out/ 2>/dev/null || true
+          date -u +%FT%TZ > /tmp/out/last_run.txt
+          cd /tmp/out && git init -q -b ur-debug
+          git -c user.name=bot -c user.email=bot@users.noreply.github.com add -A
+          git -c user.name=bot -c user.email=bot@users.noreply.github.com commit -q -m "latest run"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" ur-debug

@@ -1,12 +1,7 @@
 name: honmen-watch
 
 on:
-  schedule:
-    # 每10分钟一次，只在日本时间 6:00~24:00 运行（cron 用的是 UTC）
-    - cron: "*/10 21-23,0-14 * * *"
   workflow_dispatch: {}
-  push:
-    branches: [main]
 
 permissions:
   contents: write
