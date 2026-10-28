@@ -10,13 +10,13 @@ with sync_playwright() as p:
     b = p.chromium.launch(); pg = b.new_page(locale="ja-JP")
     pg.on("request", lambda r: out["api"].append([r.method, r.url, r.post_data]) if "api" in r.url else None)
     top = "https://www.ur-net.go.jp/chintai/kanto/kanagawa/"
-    pg.goto(top, wait_until="networkidle", timeout=60000)
+    pg.goto(top, wait_until="domcontentloaded", timeout=60000); pg.wait_for_timeout(4000)
     pg.screenshot(path="ur-debug/top.png", full_page=True)
     L = links(pg); out["pages"][top] = L
     sub = [h for t, h in L if any(k in t for k in KEYS) and "ur-net.go.jp/chintai" in h][:12]
     for h in sub:
         try:
-            pg.goto(h, wait_until="networkidle", timeout=60000)
+            pg.goto(h, wait_until="domcontentloaded", timeout=60000); pg.wait_for_timeout(4000)
             out["pages"][h] = links(pg)
         except Exception as e:
             out["pages"][h] = str(e)
@@ -29,7 +29,7 @@ with sync_playwright() as p:
                         out["danchi"][n] = h
     # open one danchi page to learn the room API
     for n, h in out["danchi"].items():
-        pg.goto(h, wait_until="networkidle", timeout=60000)
+        pg.goto(h, wait_until="domcontentloaded", timeout=60000); pg.wait_for_timeout(4000)
         pg.screenshot(path=f"ur-debug/{n}.png", full_page=True)
         open(f"ur-debug/{n}.html", "w", encoding="utf-8").write(pg.content())
         break
