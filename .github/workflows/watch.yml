@@ -1,0 +1,61 @@
+name: honmen-watch
+
+on:
+  schedule:
+    # 每10分钟一次，只在日本时间 6:00~24:00 运行（cron 用的是 UTC）
+    - cron: "*/10 21-23,0-14 * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: honmen-watch
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache Playwright browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-v1
+
+      - name: Restore notify state
+        uses: actions/cache/restore@v4
+        with:
+          path: state
+          key: notify-state-${{ github.run_id }}
+          restore-keys: notify-state-
+
+      - name: Install
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Check slots
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          TARGET_DATE: ${{ vars.TARGET_DATE || '2026-11-19' }}
+        run: python watch.py
+
+      - name: Save notify state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state
+          key: notify-state-${{ github.run_id }}
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-screenshots
+          path: debug/
+          retention-days: 3
