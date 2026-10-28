@@ -114,6 +114,8 @@ def check(page):
 
 
 def main():
+    if os.path.exists("TEST_PUSH"):
+        push("测试推送", "本免空位监控已连接成功，有更早空位时会这样提醒你", priority="default")
     os.makedirs("state", exist_ok=True)
     try:
         notified = set(json.load(open(STATE_FILE)))
