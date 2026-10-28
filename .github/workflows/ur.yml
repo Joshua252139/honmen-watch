@@ -34,6 +34,7 @@ jobs:
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           NTFY_EMAIL: ${{ secrets.NTFY_EMAIL }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
         run: python3 ur/watch.py 2>&1 | tee ur-run.log; exit ${PIPESTATUS[0]}
 
       - name: Save state

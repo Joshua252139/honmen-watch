@@ -8,6 +8,8 @@ import json
 import urllib.parse
 import urllib.request
 import urllib.error
+import smtplib
+from email.message import EmailMessage
 import datetime as dt
 from zoneinfo import ZoneInfo
 
@@ -22,7 +24,8 @@ DANCHI = {
 API = "https://chintai.r6.ur-net.go.jp/chintai/api/bukken/detail/detail_bukken_room/"
 DRY_RUN = os.path.exists("ur/DRY_RUN")  # 调试用：不推送、不保存状态
 NTFY_TOPIC = "" if DRY_RUN else os.environ.get("NTFY_TOPIC", "")
-NTFY_EMAIL = os.environ.get("NTFY_EMAIL", "")  # 同时发邮件（从 GitHub Secrets 读取）
+NTFY_EMAIL = os.environ.get("NTFY_EMAIL", "")            # 收件/发件的 Gmail 地址（GitHub Secrets）
+GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "").replace(" ", "")  # Gmail 应用专用密码
 STATE_FILE = "ur-state/seen.json"
 JST = ZoneInfo("Asia/Tokyo")
 
@@ -48,16 +51,31 @@ def _send(title, msg, click, email=""):
     return False
 
 
+def send_email(title, msg, click):
+    if not (NTFY_EMAIL and GMAIL_APP_PASSWORD):
+        print("   未设置 GMAIL_APP_PASSWORD，跳过邮件")
+        return
+    m = EmailMessage()
+    m["Subject"] = title
+    m["From"] = NTFY_EMAIL
+    m["To"] = NTFY_EMAIL
+    m.set_content(msg + "\n\n" + click)
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as smtp:
+            smtp.login(NTFY_EMAIL, GMAIL_APP_PASSWORD)
+            smtp.send_message(m)
+        print("   邮件已发送")
+    except Exception as e:
+        print("   邮件发送失败:", e)
+
+
 def push(title, msg, click):
     print(f"[推送] {title}\n{msg}")
+    send_email(title, msg, click)
     if not NTFY_TOPIC:
-        print("!! 没有读取到 NTFY_TOPIC 密钥，推送没有发出")
+        print("!! 没有读取到 NTFY_TOPIC 密钥，手机推送没有发出")
         return
-    print(f"   推送到 topic: {NTFY_TOPIC[:4]}…{NTFY_TOPIC[-2:]}（长度 {len(NTFY_TOPIC)}）")
-    if NTFY_EMAIL and _send(title, msg, click, NTFY_EMAIL):
-        print("   已同时发送邮件")
-        return
-    _send(title, msg, click)  # 邮件失败时，至少保证手机推送
+    _send(title, msg, click)
 
 
 def fetch_rooms(shisya, danchi, shikibetu):
