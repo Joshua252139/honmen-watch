@@ -7,6 +7,7 @@ import os
 import json
 import urllib.parse
 import urllib.request
+import urllib.error
 import datetime as dt
 from zoneinfo import ZoneInfo
 
@@ -30,20 +31,33 @@ def page_url(shisya, danchi, shikibetu):
     return f"https://www.ur-net.go.jp/chintai/kanto/kanagawa/{shisya}_{danchi}{shikibetu}.html"
 
 
+def _send(title, msg, click, email=""):
+    headers = {"Title": title.encode("utf-8"), "Click": click, "Priority": "high", "Tags": "house"}
+    if email:
+        headers["Email"] = email
+        msg = msg + "\n\n" + click
+    req = urllib.request.Request(f"https://ntfy.sh/{NTFY_TOPIC}", data=msg.encode("utf-8"), headers=headers)
+    try:
+        resp = urllib.request.urlopen(req, timeout=15)
+        print("   ntfy 返回:", resp.status, resp.read().decode()[:150])
+        return True
+    except urllib.error.HTTPError as e:
+        print("   ntfy 错误:", e.code, e.read().decode()[:300])
+    except Exception as e:
+        print("   ntfy 错误:", e)
+    return False
+
+
 def push(title, msg, click):
     print(f"[推送] {title}\n{msg}")
     if not NTFY_TOPIC:
         print("!! 没有读取到 NTFY_TOPIC 密钥，推送没有发出")
         return
     print(f"   推送到 topic: {NTFY_TOPIC[:4]}…{NTFY_TOPIC[-2:]}（长度 {len(NTFY_TOPIC)}）")
-    headers = {"Title": title.encode("utf-8"), "Click": click, "Priority": "high", "Tags": "house"}
-    if NTFY_EMAIL:
-        headers["Email"] = NTFY_EMAIL
-        msg = msg + "\n\n" + click
-        print("   同时发送邮件")
-    req = urllib.request.Request(f"https://ntfy.sh/{NTFY_TOPIC}", data=msg.encode("utf-8"), headers=headers)
-    resp = urllib.request.urlopen(req, timeout=15)
-    print("   ntfy 返回:", resp.status, resp.read().decode()[:200])
+    if NTFY_EMAIL and _send(title, msg, click, NTFY_EMAIL):
+        print("   已同时发送邮件")
+        return
+    _send(title, msg, click)  # 邮件失败时，至少保证手机推送
 
 
 def fetch_rooms(shisya, danchi, shikibetu):
