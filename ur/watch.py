@@ -97,6 +97,11 @@ def describe(room):
 
 
 def main():
+    if DRY_RUN:
+        for dn in ("145", "309"):
+            rs = fetch_rooms("40", dn, "0")
+            print("CONTROL", dn, len(rs))
+            if rs: print(json.dumps(rs[0], ensure_ascii=False)[:2500])
     os.makedirs("ur-state", exist_ok=True)
     try:
         seen = json.load(open(STATE_FILE, encoding="utf-8"))
