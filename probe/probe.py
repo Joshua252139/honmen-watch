@@ -18,6 +18,9 @@ def cap(pg, n):
     print(n, pg.url, len(out))
 with sync_playwright() as p:
     b = p.chromium.launch(); pg = b.new_page(locale="ja-JP", timezone_id="Asia/Tokyo")
+    logs = []
+    pg.context.on("console", lambda m: logs.append(f"console {m.type}: {m.text}"))
+    pg.context.on("response", lambda r: logs.append(f"resp {r.status} {r.url}") if "tokyo-madoguchi" in r.url else None)
     pg.goto(URL, wait_until="networkidle", timeout=60000); cap(pg, 0)
     for i, text in enumerate(STEPS, 1):
         try:
@@ -28,4 +31,13 @@ with sync_playwright() as p:
         except Exception:
             pass
         pg.wait_for_load_state("networkidle"); cap(pg, i)
+    pg.wait_for_timeout(5000); cap(pg, 9)
+    print("TEXT:", pg.evaluate("() => document.body.innerText")[:1500])
+    try:
+        js = pg.evaluate("async () => (await fetch('/police-pref-tokyo/01/js/MKAYMA001MessagesJa.js')).text()")
+        import re
+        for m in re.findall(r".{0,40}M340.{0,200}", js): print("MSG:", m)
+        open("debug/messages.js","w",encoding="utf-8").write(js)
+    except Exception as e: print("msgfetch", e)
+    print("\n".join(logs[-60:]))
     b.close()
