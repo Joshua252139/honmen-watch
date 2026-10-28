@@ -1,6 +1,9 @@
 name: ur-watch
 
 on:
+  schedule:
+    # 每10分钟一次，只在日本时间 6:00~24:00 运行（cron 用的是 UTC）
+    - cron: "*/10 21-23,0-14 * * *"
   push:
     branches: [main]
     paths: ["ur/**", ".github/workflows/ur.yml"]
@@ -16,24 +19,29 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+
+      - name: Restore state
+        uses: actions/cache/restore@v4
         with:
-          python-version: "3.12"
-      - uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-chromium-v1
-      - name: Install
-        run: |
-          pip install playwright
-          python -m playwright install --with-deps chromium
-      - name: Run
+          path: ur-state
+          key: ur-state-${{ github.run_id }}
+          restore-keys: ur-state-
+
+      - name: Check rooms
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-        run: python ur/probe.py 2>&1 | tee ur-run.log
+        run: python3 ur/watch.py 2>&1 | tee ur-run.log; exit ${PIPESTATUS[0]}
+
+      - name: Save state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ur-state
+          key: ur-state-${{ github.run_id }}
+
       - name: Publish debug
         if: always()
         run: |
