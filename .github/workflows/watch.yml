@@ -48,7 +48,8 @@ jobs:
       - name: Check slots
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-          TARGET_DATE: "2027-12-31"   # 不限日期：40天内任何空位都提醒
+          TARGET_DATE: "2027-12-31"
+          WINDOW_DAYS: "10"   # 只提醒未来10天内的捡漏名额
         run: |
           python watch.py 2>&1 | tee run.log; exit ${PIPESTATUS[0]}
 

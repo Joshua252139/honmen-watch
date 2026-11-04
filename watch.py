@@ -12,7 +12,8 @@ from zoneinfo import ZoneInfo
 
 from playwright.sync_api import sync_playwright
 
-TARGET_DATE = os.environ.get("TARGET_DATE", "2026-11-19")   # 现有预约日期
+TARGET_DATE = os.environ.get("TARGET_DATE", "2027-12-31")   # 只提醒这天之前的空位
+WINDOW_DAYS = int(os.environ.get("WINDOW_DAYS", "0") or 0)    # >0 时只提醒未来 N 天内的空位
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "")                # 从 GitHub Secrets 读取
 URL = "https://apply.e-tumo.jp/menkyo-saitama-u/reserve/offerList_detail?tempSeq=121593"
 AVAILABLE_MARKS = ["○", "◯", "△"]
@@ -85,6 +86,8 @@ def snap(page, name):
 def check(page):
     today = dt.datetime.now(JST).date()
     target = dt.date.fromisoformat(TARGET_DATE)
+    if WINDOW_DAYS:  # 只看未来 N 天
+        target = min(target, today + dt.timedelta(days=WINDOW_DAYS + 1))
     page.goto(URL, wait_until="networkidle", timeout=60000)
     found, labels_seen = set(), set()
     for i in range(6):  # 40天大约3页，多翻几次保险
@@ -141,7 +144,7 @@ def main():
                  + " 有空位，点开去预约（选「2回目以降」「外国語」）")
         notified = set(keys)
     else:
-        print(f"{now} 暂无空位（截至 {TARGET_DATE}）")
+        print(f"{now} 未来 {WINDOW_DAYS} 天内暂无空位" if WINDOW_DAYS else f"{now} 暂无空位（截至 {TARGET_DATE}）")
         notified = set()
     json.dump(sorted(notified), open(STATE_FILE, "w"))
 
