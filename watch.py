@@ -46,7 +46,7 @@ def parse_date(text, today):
     return None
 
 
-ROW_KEYWORDS = ["1回目", "日本語"]           # 只看「1回目（初めて） 日本語」这一行
+ROW_KEYWORDS = ["2回目", "外国語"]           # 只看「2回目以降 外国語」这一行
 UNAVAILABLE = {"時間外", "空き無"}           # 页面上 －、× 对应的标签
 
 # 日期在 id=height_headday 的表头行；每个预约枠一行 id=height_auto_<名称>；
@@ -133,15 +133,15 @@ def main():
     now = dt.datetime.now(JST).strftime("%m/%d %H:%M")
     keys = [str(d) for d in dates]
     if keys:
-        print(f"{now} 发现更早空位: {keys}")
+        print(f"{now} 发现空位: {keys}")
         new = [k for k in keys if k not in notified]
         if new:
-            push("本免学科 有更早空位！",
+            push("本免学科（2回目以降・外国語）有空位！",
                  "、".join(dt.date.fromisoformat(k).strftime("%m/%d") for k in new)
-                 + " 有空位，点开去预约（先确认能选，再取消旧预约）")
+                 + " 有空位，点开去预约（选「2回目以降」「外国語」）")
         notified = set(keys)
     else:
-        print(f"{now} 暂无比 {TARGET_DATE} 更早的空位")
+        print(f"{now} 暂无空位（截至 {TARGET_DATE}）")
         notified = set()
     json.dump(sorted(notified), open(STATE_FILE, "w"))
 
