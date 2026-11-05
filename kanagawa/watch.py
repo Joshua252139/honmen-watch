@@ -76,7 +76,11 @@ JS_ROWS = """
 def collect(page):
     page.goto(START_URL, wait_until="networkidle", timeout=60000)
     snap(page, "p0_start")
-    box = page.locator('input[type=text]').first
+    # 首页没有搜索框：先点「オンライン申請手続き」进入手续检索页
+    page.locator('.common-button:has-text("オンライン申請手続き")').first.click()
+    page.wait_for_load_state("networkidle")
+    snap(page, "p0b_search")
+    box = page.locator('input[type=text]:visible').first
     box.fill(KEYWORD)
     btn = page.locator('input[value*="検索"], button:has-text("検索"), a:has-text("検索")')
     btn.first.click()
