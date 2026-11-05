@@ -66,9 +66,8 @@ def snap(page, name):
 
 
 JS_ROWS = """
-() => [...document.querySelectorAll('tr')]
-  .filter(tr => tr.querySelector('a, input[type=button], input[type=submit]'))
-  .map(tr => tr.innerText.replace(/[ \\t]+/g, ' ').replace(/\\n+/g, ' | ').trim())
+() => [...document.querySelectorAll('.common-card')]
+  .map(c => c.innerText.replace(/[ \\t]+/g, ' ').replace(/\\n+/g, ' | ').trim())
   .filter(t => t.length > 0)
 """
 
@@ -82,9 +81,8 @@ def collect(page):
     snap(page, "p0b_search")
     box = page.locator('input[type=text]:visible').first
     box.fill(KEYWORD)
-    btn = page.locator('input[value*="検索"], button:has-text("検索"), a:has-text("検索")')
-    btn.first.click()
-    page.wait_for_load_state("networkidle")
+    with page.expect_navigation(wait_until="networkidle", timeout=60000):
+        page.locator('input[value="キーワード検索"]').first.click()
     rows, seen = [], set()
     for i in range(MAX_PAGES):
         snap(page, f"p{i + 1}")
@@ -93,12 +91,12 @@ def collect(page):
         for r in new:
             seen.add(r)
             rows.append(r)
-        print(f"第{i + 1}页: {len(got)} 行（新增 {len(new)}）")
-        nxt = page.locator('a:has-text("次へ"), a:has-text("次のページ"), input[value*="次"], a:has-text(">")')
-        if nxt.count() == 0 or not nxt.first.is_visible() or not new:
+        print(f"第{i + 1}页: {len(got)} 张卡片（新增 {len(new)}）")
+        nxt = page.locator('.common-pagebar.sp_none a:has(.common-pagebar-arrow._next)')
+        if nxt.count() == 0 or not new:
             break
-        nxt.first.click()
-        page.wait_for_load_state("networkidle")
+        with page.expect_navigation(wait_until="networkidle", timeout=60000):
+            nxt.first.click()
     return rows
 
 
