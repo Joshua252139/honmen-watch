@@ -18,7 +18,7 @@ from playwright.sync_api import sync_playwright
 
 START_URL = "https://dshinsei.e-kanagawa.lg.jp/140007-u/offer/offerList_initDisplay.action"
 KEYWORD = os.environ.get("SEARCH_KEYWORD", "運転免許学科試験")
-NAME_KEYWORDS = [k for k in os.environ.get("NAME_KEYWORDS", "中国語,外国語").split(",") if k]  # 任意一个命中即可
+NAME_KEYWORDS = [k for k in os.environ.get("NAME_KEYWORDS", "運転免許学科試験").split(",") if k]  # 任意一个命中即可
 TARGET_DATE = os.environ.get("TARGET_DATE", "2027-12-31")   # 只提醒这天之前的
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "")
 DISCOVER = os.environ.get("DISCOVER", "") == "1"
@@ -126,19 +126,19 @@ def main():
     hits = [(parse_date(r, today), r) for r in rows if any(k in r for k in NAME_KEYWORDS)]
     print(f"名称含 {NAME_KEYWORDS} 的: {len(hits)} 条")
     dated = sorted([(d, r) for d, r in hits if d], key=lambda x: x[0])
-    for d, r in dated:
-        print("  ", d, r)
     if dated:
-        print(f"==> 目前能约到的最晚日期: {dated[-1][0]}；最早: {dated[0][0]}")
+        opened = [d for d, r in dated if "近日受付開始" not in r and "終了" not in r.split("受付終了：")[-1]]
+        print(f"==> 页面上最晚的场次: {dated[-1][0]}；其中已开放预约的最晚一天: {max(opened) if opened else '无'}")
     now = dt.datetime.now(JST).strftime("%m/%d %H:%M")
-    fresh = [(d, r) for d, r in dated if today < d < target]
+    first_run = not os.path.exists(STATE_FILE)
+    fresh = [(d, r) for d, r in dated if today <= d < target]
     new = [(d, r) for d, r in fresh if r not in notified]
-    if new:
-        push("神奈川本免学科（中文/外国语）有新场次！",
-             "、".join(d.strftime("%m/%d") for d, _ in new) + " 点开去预约")
+    if new and not first_run:
+        push("神奈川本免学科 有新场次开放",
+             "、".join(sorted({d.strftime("%m/%d") for d, _ in new})) + " 点开去预约")
     else:
-        print(f"{now} 没有新场次")
-    json.dump(sorted({r for _, r in fresh}), open(STATE_FILE, "w"), ensure_ascii=False)
+        print(f"{now} 没有新场次" + ("（首次运行，仅记录基线）" if first_run else ""))
+    json.dump(sorted({r for _, r in fresh} | notified), open(STATE_FILE, "w"), ensure_ascii=False)
 
 
 if __name__ == "__main__":

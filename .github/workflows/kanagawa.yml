@@ -48,7 +48,7 @@ jobs:
       - name: Check slots
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-          DISCOVER: "1"          # 第一阶段：打印所有手続き名；确认后改成 ""
+          DISCOVER: ""
         run: python kanagawa/watch.py 2>&1 | tee run.log; exit ${PIPESTATUS[0]}
 
       - name: Save notify state
