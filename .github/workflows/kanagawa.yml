@@ -1,0 +1,69 @@
+name: kanagawa-watch
+
+on:
+  # 先只手动触发，确认页面能正确解析后再打开下面的定时
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths: ["kanagawa/**", ".github/workflows/kanagawa.yml"]
+  # schedule:
+  #   - cron: "*/10 21-23,0-14 * * *"   # 每10分钟，日本时间 6:00~24:00
+
+permissions:
+  contents: write
+
+concurrency:
+  group: kanagawa-watch
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache Playwright browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-v1
+
+      - name: Restore notify state
+        uses: actions/cache/restore@v4
+        with:
+          path: state
+          key: kanagawa-state-${{ github.run_id }}
+          restore-keys: kanagawa-state-
+
+      - name: Install
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Check slots
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          DISCOVER: "1"          # 第一阶段：打印所有手続き名；确认后改成 ""
+        run: python kanagawa/watch.py 2>&1 | tee run.log; exit ${PIPESTATUS[0]}
+
+      - name: Save notify state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state
+          key: kanagawa-state-${{ github.run_id }}
+
+      - name: Publish debug
+        if: always()
+        run: |
+          mkdir -p /tmp/out && cp -r debug run.log /tmp/out/ 2>/dev/null || true
+          date -u +%FT%TZ > /tmp/out/last_run.txt
+          cd /tmp/out && git init -q -b kanagawa-debug
+          git -c user.name=bot -c user.email=bot@users.noreply.github.com add -A
+          git -c user.name=bot -c user.email=bot@users.noreply.github.com commit -q -m "latest run"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" kanagawa-debug
