@@ -142,4 +142,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    from playwright.sync_api import TimeoutError as PWTimeout
+    try:
+        main()
+    except PWTimeout as e:
+        # 网站偶尔加载超时：只记日志，不当作失败（避免 GitHub 发「Run failed」邮件）
+        print("页面加载超时，本次跳过:", str(e).splitlines()[0])
